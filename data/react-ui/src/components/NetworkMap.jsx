@@ -387,14 +387,14 @@ export function NetworkMap() {
   }, [rawData, filters, layoutStyle, externalNode]);
 
   return (
-    <div className="relative w-full h-full bg-white border rounded p-4 flex flex-col">
+    <div className="relative w-full h-full bg-white dark:bg-gray-800 border dark:border-gray-700 rounded p-4 flex flex-col">
 
       {/* Layout Selector + Filters */}
       <div className="flex flex-wrap gap-2 mb-4 items-center shrink-0">
         <select
           value={layoutStyle}
           onChange={(e) => setLayoutStyle(e.target.value)}
-          className="border p-1 rounded"
+          className="border dark:border-gray-600 p-1 rounded dark:bg-gray-700 dark:text-white"
         >
           <option value="default">Default Layout</option>
           <option value="hierarchical">Hierarchical</option>
@@ -406,12 +406,12 @@ export function NetworkMap() {
           placeholder="Filter by name"
           value={filters.name}
           onChange={(e) => setFilters({ ...filters, name: e.target.value })}
-          className="border p-1 rounded"
+          className="border dark:border-gray-600 p-1 rounded dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
         />
         <select
           value={filters.group}
           onChange={(e) => setFilters({ ...filters, group: e.target.value })}
-          className="border p-1 rounded"
+          className="border dark:border-gray-600 p-1 rounded dark:bg-gray-700 dark:text-white"
         >
           <option value="">All Groups</option>
           <option value="docker">Docker</option>
@@ -422,16 +422,16 @@ export function NetworkMap() {
           placeholder="Filter by subnet (e.g. 10.0.1)"
           value={filters.subnet}
           onChange={(e) => setFilters({ ...filters, subnet: e.target.value })}
-          className="border p-1 rounded"
+          className="border dark:border-gray-600 p-1 rounded dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
         />
       </div>
 
       {error ? (
-        <div className="text-red-500">{error}</div>
+        <div className="text-red-500 dark:text-red-400">{error}</div>
       ) : (
         <>
           {/* Map area flexes to fill available height */}
-          <div ref={containerRef} className="w-full flex-1 min-h-0 bg-gray-200 rounded" />
+          <div ref={containerRef} className="w-full flex-1 min-h-0 bg-gray-200 dark:bg-gray-700 rounded" />
 
           {/* Overlay the selected node panel so it doesn't change layout height */}
           <div className="absolute top-20 right-6 z-10 max-w-sm">
@@ -442,7 +442,7 @@ export function NetworkMap() {
             />
           </div>
 
-          <div className="absolute bottom-4 right-4 bg-white border shadow rounded p-3 text-sm z-10 w-64">
+          <div className="absolute bottom-4 right-4 bg-white dark:bg-gray-800 border dark:border-gray-600 shadow rounded p-3 text-sm dark:text-gray-200 z-10 w-64">
             <h3 className="font-semibold mb-2">Legend</h3>
             <ul className="space-y-1">
               <li>

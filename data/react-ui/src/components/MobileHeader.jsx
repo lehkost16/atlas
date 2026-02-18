@@ -1,8 +1,9 @@
 import React from "react";
+import ThemeToggle from "./ThemeToggle";
 
-export default function MobileHeader({ onOpenMenu, onOpenLogin, githubUrl }) {
+export default function MobileHeader({ onOpenMenu, onOpenLogin, githubUrl, themePreference, setThemePreference }) {
   return (
-    <div className="lg:hidden bg-gray-900 text-white px-3 py-2 flex items-center shadow-md">
+    <div className="lg:hidden bg-gray-900 dark:bg-gray-800 text-white px-3 py-2 flex items-center shadow-md">
       {/* Left: logo + menu */}
       <div className="flex items-center space-x-2">
         {/* Logo placeholder - replace with SVG when available */}
@@ -27,16 +28,19 @@ export default function MobileHeader({ onOpenMenu, onOpenLogin, githubUrl }) {
         <input
           aria-label="Search"
           placeholder=""
-          className="w-full bg-gray-800 text-white placeholder-gray-400 rounded-full px-3 py-1 focus:outline-none"
+          className="w-full bg-gray-800 dark:bg-gray-700 text-white placeholder-gray-400 dark:placeholder-gray-500 rounded-full px-3 py-1 focus:outline-none"
           value={""}
           readOnly
         />
       </div>
 
-      {/* Right: repo + login/user icon */}
+      {/* Right: theme + repo + login/user icon */}
       <div className="flex items-center">
+        <div className="mr-1">
+          <ThemeToggle themePreference={themePreference} setThemePreference={setThemePreference} />
+        </div>
         <a
-          className="text-gray-300 hover:text-white p-2 rounded-full hover:bg-gray-800 transition-colors"
+          className="text-gray-300 hover:text-white p-2 rounded-full hover:bg-gray-800 dark:hover:bg-gray-700 transition-colors"
           title="View on GitHub"
           aria-label="View on GitHub"
           href={githubUrl}
@@ -48,7 +52,7 @@ export default function MobileHeader({ onOpenMenu, onOpenLogin, githubUrl }) {
           </svg>
         </a>
         <button
-          className="text-gray-300 hover:text-white p-2 rounded-full hover:bg-gray-800 transition-colors"
+          className="text-gray-300 hover:text-white p-2 rounded-full hover:bg-gray-800 dark:hover:bg-gray-700 transition-colors"
           title="User Login (Coming Soon)"
           aria-label="User Login"
           onClick={() => onOpenLogin?.()}
