@@ -246,7 +246,7 @@ The built output will be in:
 /swarm/data/atlas/react-ui/dist/
 ```
 
-For development CI/CD (for UI and backend anf build a new docker version):
+For development CI/CD (for UI and backend and build a new docker version):
 ```bash
 /swarm/github-repos/atlas/deploy.sh
 ```
