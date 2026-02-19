@@ -35,6 +35,16 @@ export function NetworkMap() {
   const [externalNode, setExternalNode] = useState(null);
   const [selectedSubnet, setSelectedSubnet] = useState(null);
   const [layoutStyle, setLayoutStyle] = useState("default");
+  const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains("dark"));
+
+  // Observe <html> class changes so canvas re-renders when theme toggles
+  useEffect(() => {
+    const observer = new MutationObserver(() => {
+      setIsDark(document.documentElement.classList.contains("dark"));
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+    return () => observer.disconnect();
+  }, []);
 
   /**
    * Initial data load (hosts + external)
@@ -80,6 +90,8 @@ export function NetworkMap() {
   useEffect(() => {
     if (!rawData.nonDockerHosts.length && !rawData.dockerHosts.length) return;
 
+    const labelColor = isDark ? "#fff" : "#000";
+
     const nodes = new DataSet();
     const edges = new DataSet();
     const infoMap = {};
@@ -99,7 +111,7 @@ export function NetworkMap() {
             label: networkName ? `${networkName}` : `${subnet}.x`,
             shape: "box",
             color: getHubColor(subnet),
-            font: { size: 14, color: "#000" },
+            font: { size: 14, color: labelColor },
             level: 1, // Below Internet
           });
         }
@@ -119,7 +131,7 @@ export function NetworkMap() {
             label: networkName,
             shape: "box",
             color: "#10b981",
-            font: { size: 12, color: "#000" },
+            font: { size: 12, color: labelColor },
             level: 3,
         });
       }
@@ -261,7 +273,7 @@ export function NetworkMap() {
           label: `Internet\n(${externalNode.ip})`,
           shape: "box",
           color: "#f43f5e",
-          font: { size: 12, color: "#000" },
+          font: { size: 12, color: labelColor },
           level: 0,
         });
       }
@@ -340,7 +352,7 @@ export function NetworkMap() {
           springConstant: 0.05,
         },
       },
-      nodes: { shape: "dot", size: 16, font: { size: 12 } },
+      nodes: { shape: "dot", size: 16, font: { size: 12, color: labelColor } },
       edges: {
         arrows: "to",
         smooth: true,
@@ -384,7 +396,7 @@ export function NetworkMap() {
       });
       networkRef.current = net;
     }
-  }, [rawData, filters, layoutStyle, externalNode]);
+  }, [rawData, filters, layoutStyle, externalNode, isDark]);
 
   return (
     <div className="relative w-full h-full bg-white dark:bg-gray-800 border dark:border-gray-700 rounded p-4 flex flex-col">
