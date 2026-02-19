@@ -184,10 +184,10 @@ export function ScriptsPanel() {
   return (
     <div className="flex flex-col gap-4 h-full w-full">
       {/* Scheduler Status Panel */}
-  <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm w-full shrink-0">
-        <h2 className="text-lg font-semibold mb-3">Scan Scheduler</h2>
+  <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 shadow-sm w-full shrink-0">
+        <h2 className="text-lg font-semibold mb-3 dark:text-gray-200">Scan Scheduler</h2>
         {loadingIntervals ? (
-          <p className="text-gray-500">Loading intervals...</p>
+          <p className="text-gray-500 dark:text-gray-400">Loading intervals...</p>
         ) : (
           <div className="space-y-3">
             {SCRIPTS.map((script) => {
@@ -195,10 +195,10 @@ export function ScriptsPanel() {
               const isEditing = editingInterval[script.intervalKey];
               
               return (
-                <div key={script.intervalKey} className="flex items-center justify-between border-b pb-2">
+                <div key={script.intervalKey} className="flex items-center justify-between border-b dark:border-gray-700 pb-2">
                   <div className="flex-1">
-                    <span className="font-medium">{script.label}</span>
-                    <span className="text-sm text-gray-500 ml-2">
+                    <span className="font-medium dark:text-gray-200">{script.label}</span>
+                    <span className="text-sm text-gray-500 dark:text-gray-400 ml-2">
                       ({script.key})
                     </span>
                   </div>
@@ -210,10 +210,10 @@ export function ScriptsPanel() {
                         min="60"
                         step="60"
                         defaultValue={interval}
-                        className="border rounded px-2 py-1 w-24"
+                        className="border dark:border-gray-600 rounded px-2 py-1 w-24 dark:bg-gray-700 dark:text-white"
                         id={`interval-${script.intervalKey}`}
                       />
-                      <span className="text-sm text-gray-500">seconds</span>
+                      <span className="text-sm text-gray-500 dark:text-gray-400">seconds</span>
                       <button
                         className="px-2 py-1 rounded bg-green-600 text-white text-sm"
                         onClick={() => {
@@ -224,7 +224,7 @@ export function ScriptsPanel() {
                         Save
                       </button>
                       <button
-                        className="px-2 py-1 rounded bg-gray-300 text-gray-800 text-sm"
+                        className="px-2 py-1 rounded bg-gray-300 dark:bg-gray-600 text-gray-800 dark:text-gray-200 text-sm"
                         onClick={() => setEditingInterval({})}
                       >
                         Cancel
@@ -232,7 +232,7 @@ export function ScriptsPanel() {
                     </div>
                   ) : (
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-mono bg-gray-100 px-2 py-1 rounded">
+                      <span className="text-sm font-mono bg-gray-100 dark:bg-gray-700 dark:text-gray-200 px-2 py-1 rounded">
                         Every {formatInterval(interval)}
                       </span>
                       <button
@@ -246,7 +246,7 @@ export function ScriptsPanel() {
                 </div>
               );
             })}
-            <p className="text-xs text-gray-500 mt-2">
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
               Scans run automatically at the configured intervals. Changes take effect immediately.
             </p>
           </div>
@@ -254,12 +254,12 @@ export function ScriptsPanel() {
       </div>
 
       {/* Manual Script Executor Panel */}
-  <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm w-full flex-1 min-h-0 flex flex-col">
-        <h2 className="text-lg font-semibold mb-2">Manual Script Executor</h2>
+  <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 shadow-sm w-full flex-1 min-h-0 flex flex-col">
+        <h2 className="text-lg font-semibold mb-2 dark:text-gray-200">Manual Script Executor</h2>
         <div className="flex flex-wrap items-center gap-3">
-          <label className="font-medium">Script</label>
+          <label className="font-medium dark:text-gray-200">Script</label>
           <select
-            className="border rounded px-2 py-1"
+            className="border dark:border-gray-600 rounded px-2 py-1 dark:bg-gray-700 dark:text-white"
             value={selected}
             onChange={(e) => setSelected(e.target.value)}
             disabled={isLive || busy}
@@ -296,7 +296,7 @@ export function ScriptsPanel() {
 
 
         {/* Fill remaining space with output; internal scroll */}
-        <div className="mt-3 flex-1 min-h-0 overflow-auto whitespace-pre-wrap font-mono rounded border border-gray-200 bg-gray-50 p-3">
+        <div className="mt-3 flex-1 min-h-0 overflow-auto whitespace-pre-wrap font-mono rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 dark:text-green-300 p-3">
           {liveLines.map((l, i) => (
             <div key={i}>{l}</div>
           ))}

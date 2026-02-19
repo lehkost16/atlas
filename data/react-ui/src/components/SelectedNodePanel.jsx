@@ -2,7 +2,7 @@ export function SelectedNodePanel({ node, subnet, route }) {
   if (!node && !subnet && !route) return null;
 
   return (
-    <div className="top-4 right-4 bg-white border shadow rounded p-4 text-sm z-10 w-72">
+    <div className="top-4 right-4 bg-white dark:bg-gray-800 border dark:border-gray-600 shadow rounded p-4 text-sm dark:text-gray-200 z-10 w-72">
       <h3 className="font-semibold mb-2">Subnet Info</h3>
 
       {/* Subnet node */}

@@ -8,7 +8,8 @@ import { apiGet, getAuthToken } from "./api";
 import BuildTag from "./components/BuildTag";
 import MobileHeader from "./components/MobileHeader";
 import LoginModal from "./components/LoginModal";
-// Theme toggle removed per request
+import ThemeToggle from "./components/ThemeToggle";
+import { getInitialTheme, setThemeCookie, resolveTheme, applyTheme, getSystemTheme } from "./theme/themeUtils";
 
 const tabs = ["Network Map", "Hosts Table", "Scripts", "Logs"];
 
@@ -70,14 +71,14 @@ function Sidebar({ activeTab, setActiveTab, visible, setVisible, onShowDuplicate
       {/* Overlay (mobile only) */}
       {visible && (
         <div
-          className="fixed inset-0 bg-black/40 z-30 lg:hidden"
+          className="fixed inset-0 bg-black/40 dark:bg-black/60 z-30 lg:hidden"
           onClick={() => setVisible(false)}
         ></div>
       )}
 
       {/* Sidebar container (mobile: slide-over, desktop: collapsible rail) */}
       <div
-        className={`z-40 top-0 left-0 bg-gray-900 text-white flex flex-col transition-all duration-300
+        className={`z-40 top-0 left-0 bg-gray-900 dark:bg-gray-800 text-white flex flex-col transition-all duration-300
         fixed h-full w-64 transform ${visible ? "translate-x-0" : "-translate-x-full"} lg:static lg:h-auto lg:transform-none
         ${visible ? "lg:w-64" : "lg:w-16"}`}
         ref={sidebarRef}
@@ -113,7 +114,7 @@ function Sidebar({ activeTab, setActiveTab, visible, setVisible, onShowDuplicate
                 }}
                 title={tab}
                 className={`w-full flex items-center ${visible ? "justify-start" : "justify-center"} p-2 rounded transition-colors duration-200 ${
-                  activeTab === tab ? "bg-gray-700" : "hover:bg-gray-800"
+                  activeTab === tab ? "bg-gray-700 dark:bg-gray-600" : "hover:bg-gray-800 dark:hover:bg-gray-700"
                 }`}
               >
                 <TabIcon tab={tab} />
@@ -130,7 +131,7 @@ function Sidebar({ activeTab, setActiveTab, visible, setVisible, onShowDuplicate
         </div>
 
         {/* Stats (hidden on desktop when collapsed) */}
-        <div className={`mt-auto text-sm pt-6 border-t border-gray-700 px-4 ${visible ? "lg:block" : "lg:hidden"}`}>
+        <div className={`mt-auto text-sm pt-6 border-t border-gray-700 dark:border-gray-600 px-4 ${visible ? "lg:block" : "lg:hidden"}`}>
           <h2 className="font-semibold mb-1">Network Stats:</h2>
           <p>Total Hosts: {stats.total}</p>
           <p>
@@ -172,9 +173,47 @@ export default function App() {
   const githubUrl = "https://github.com/karam-ajaj/atlas";
 
   const [authState, setAuthState] = useState({ checked: false, enabled: false, authenticated: false });
+  
+  // Theme state: user's preference (light/dark/auto)
+  const [themePreference, setThemePreference] = useState(() => getInitialTheme());
 
   const openLogin = () => setLoginVisible(true);
   const closeLogin = () => setLoginVisible(false);
+
+  // Initialize and apply theme on mount
+  useEffect(() => {
+    const effectiveTheme = resolveTheme(themePreference);
+    applyTheme(effectiveTheme);
+  }, []);
+
+  // Update theme when preference changes
+  useEffect(() => {
+    setThemeCookie(themePreference);
+    const effectiveTheme = resolveTheme(themePreference);
+    applyTheme(effectiveTheme);
+  }, [themePreference]);
+
+  // Listen for OS theme changes when in auto mode
+  useEffect(() => {
+    if (themePreference !== 'auto') return;
+
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleChange = () => {
+      const effectiveTheme = resolveTheme(themePreference);
+      applyTheme(effectiveTheme);
+    };
+
+    // Modern browsers
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener('change', handleChange);
+      return () => mediaQuery.removeEventListener('change', handleChange);
+    } 
+    // Fallback for older browsers
+    else if (mediaQuery.addListener) {
+      mediaQuery.addListener(handleChange);
+      return () => mediaQuery.removeListener(handleChange);
+    }
+  }, [themePreference]);
 
   // Auth gate: if server auth is enabled, require login before rendering the app.
   useEffect(() => {
@@ -260,12 +299,12 @@ export default function App() {
   // Prevent any data/UI flash before auth check completes.
   // If auth is enabled, we will immediately show the login gate after the check.
   if (!authState.checked) {
-    return <div className="h-screen bg-gray-100" />;
+    return <div className="h-screen bg-gray-100 dark:bg-gray-900" />;
   }
 
   if (mustLogin) {
     return (
-      <div className="h-screen bg-gray-100 relative">
+      <div className="h-screen bg-gray-100 dark:bg-gray-900 relative">
         <LoginModal
           open
           force
@@ -282,12 +321,14 @@ export default function App() {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-gray-100 relative">
+    <div className="flex flex-col h-screen bg-gray-100 dark:bg-gray-900 relative">
       {/* Mobile Header - only visible on mobile; pass menu opener */}
       <MobileHeader
         onOpenMenu={() => setSidebarVisible(true)}
         onOpenLogin={openLogin}
         githubUrl={githubUrl}
+        themePreference={themePreference}
+        setThemePreference={setThemePreference}
       />
 
       <div className="flex flex-1 overflow-hidden">
@@ -308,13 +349,14 @@ export default function App() {
             {/* Left placeholder (kept intentionally empty) */}
             <div />
 
-            {/* Right: desktop-only login button (placeholder for real auth) */}
-            <div className="flex items-center">
+            {/* Right: theme toggle + GitHub + login button (desktop) */}
+            <div className="flex items-center gap-2">
+              <ThemeToggle themePreference={themePreference} setThemePreference={setThemePreference} />
               <a
                 href={githubUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="hidden lg:inline-flex bg-transparent text-gray-700 hover:text-gray-900 p-2 rounded-md"
+                className="hidden lg:inline-flex bg-transparent text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white p-2 rounded-md"
                 title="View on GitHub"
                 aria-label="View on GitHub"
               >
@@ -323,7 +365,7 @@ export default function App() {
                 </svg>
               </a>
               <button
-                className="hidden lg:inline-flex bg-transparent text-gray-700 hover:text-gray-900 p-2 rounded-md"
+                className="hidden lg:inline-flex bg-transparent text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white p-2 rounded-md"
                 title="Login"
                 aria-label="Login"
                 onClick={openLogin}

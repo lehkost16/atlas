@@ -26,5 +26,5 @@ export default function BuildTag({ prefix = "v" }) {
   }, []);
 
   if (!tag) return null;
-  return <span className="text-xs text-gray-400">{prefix}{tag}</span>;
+  return <span className="text-xs text-gray-400 dark:text-gray-500">{prefix}{tag}</span>;
 }

@@ -138,14 +138,14 @@ function InlineSearchDropdown({ values, value, onChange, placeholder = "All", on
       <input
         autoFocus
         type="text"
-        className="w-full px-1 py-1 border rounded text-xs bg-white"
+        className="w-full px-1 py-1 border rounded text-xs bg-white dark:bg-gray-800 dark:text-white dark:border-gray-600"
         placeholder={`Search ${colTitle}...`}
         value={search}
         onChange={e => setSearch(e.target.value)}
       />
-      <div className="absolute left-0 top-full z-30 mt-1 bg-white border rounded shadow-md w-full max-h-48 overflow-auto">
+      <div className="absolute left-0 top-full z-30 mt-1 bg-white dark:bg-gray-800 border dark:border-gray-600 rounded shadow-md w-full max-h-48 overflow-auto">
         <div
-          className={`cursor-pointer px-2 py-1 text-xs ${!value ? "bg-blue-50" : ""}`}
+          className={`cursor-pointer px-2 py-1 text-xs ${!value ? "bg-blue-50 dark:bg-blue-900" : "dark:text-white"}`}
           onClick={() => { onChange(""); onClose(); }}
         >
           {`ALL ${colTitle}`}
@@ -153,7 +153,7 @@ function InlineSearchDropdown({ values, value, onChange, placeholder = "All", on
         {filtered.map(v => (
           <div
             key={v}
-            className={`cursor-pointer px-2 py-1 text-xs ${v === value ? "bg-blue-100" : ""}`}
+            className={`cursor-pointer px-2 py-1 text-xs ${v === value ? "bg-blue-100 dark:bg-blue-900" : "dark:text-white"}`}
             onClick={() => { onChange(v); onClose(); }}
           >
             {v}
@@ -167,11 +167,11 @@ function InlineSearchDropdown({ values, value, onChange, placeholder = "All", on
 function SortToolbar({ sortKey, setSortKey, sortDir, setSortDir, columns, colTitles }) {
   return (
     <div className="flex items-center gap-2 mb-2 ml-2">
-      <label className="font-semibold text-gray-700 mr-2">Sort by</label>
+      <label className="font-semibold text-gray-700 dark:text-gray-300 mr-2">Sort by</label>
       <select
         value={sortKey}
         onChange={e => setSortKey(e.target.value)}
-        className="px-2 py-1 rounded border border-gray-400 bg-white text-xs font-semibold"
+        className="px-2 py-1 rounded border border-gray-400 dark:border-gray-600 bg-white dark:bg-gray-700 dark:text-white text-xs font-semibold"
       >
         {columns.map(col =>
           <option key={col} value={col}>{colTitles[col]}</option>
@@ -180,14 +180,14 @@ function SortToolbar({ sortKey, setSortKey, sortDir, setSortDir, columns, colTit
       <div className="flex gap-1 items-center ml-2">
         <button
           onClick={() => setSortDir("asc")}
-          className={`px-2 py-1 rounded border text-xs font-semibold ${sortDir === "asc" ? "bg-blue-500 text-white" : "bg-white text-gray-700"}`}
+          className={`px-2 py-1 rounded border text-xs font-semibold ${sortDir === "asc" ? "bg-blue-500 text-white" : "bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300"}`}
           title="Sort ascending"
         >
           <span style={{ display: "inline-block" }}>▲</span> Ascending
         </button>
         <button
           onClick={() => setSortDir("desc")}
-          className={`px-2 py-1 rounded border text-xs font-semibold ${sortDir === "desc" ? "bg-blue-500 text-white" : "bg-white text-gray-700"}`}
+          className={`px-2 py-1 rounded border text-xs font-semibold ${sortDir === "desc" ? "bg-blue-500 text-white" : "bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300"}`}
           title="Sort descending"
         >
           <span style={{ display: "inline-block" }}>▼</span> Descending
@@ -361,8 +361,8 @@ function HostsTable({ showDuplicates = false, onClearPreset }) {
   }
 
   const thBase =
-    "px-3 text-[11px] leading-4 font-semibold uppercase tracking-wide text-gray-600 bg-gray-100 border-b-2 border-gray-200 z-20 whitespace-nowrap";
-  const tdBase = "px-3 border-b border-gray-200 align-middle";
+    "px-3 text-[11px] leading-4 font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 border-b-2 border-gray-200 dark:border-gray-600 z-20 whitespace-nowrap";
+  const tdBase = "px-3 border-b border-gray-200 dark:border-gray-700 align-middle";
   const rowH = density === "compact" ? "h-9 text-[13px]" : "h-11 text-sm";
   const thH = density === "compact" ? "h-9" : "h-10";
   const isAdvanced = mode === "advanced";
@@ -382,43 +382,43 @@ function HostsTable({ showDuplicates = false, onClearPreset }) {
   const minGridWidth = visibleColumns.reduce((sum, col) => sum + (importantCols.includes(col) ? 160 : 90), 0);
 
   return (
-    <div className="flex flex-col h-full bg-white rounded border border-gray-200 p-4 shadow-sm">
+    <div className="flex flex-col h-full bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 p-4 shadow-sm">
       <div className="mb-3 flex flex-wrap items-center gap-3">
         <input
           type="text"
           placeholder="Search hosts..."
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          className="w-full sm:w-80 md:w-96 px-3 py-2 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full sm:w-80 md:w-96 px-3 py-2 rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
         <div className="ml-auto flex items-center gap-2">
-          <div className="inline-flex rounded border overflow-hidden">
+          <div className="inline-flex rounded border dark:border-gray-600 overflow-hidden">
             <button
               onClick={() => setMode("basic")}
-              className={`px-3 py-2 text-sm ${mode === "basic" ? "bg-gray-200" : "bg-white"}`}
+              className={`px-3 py-2 text-sm ${mode === "basic" ? "bg-gray-200 dark:bg-gray-600" : "bg-white dark:bg-gray-700 dark:text-white"}`}
               title="Show key columns only"
             >
               Basic
             </button>
             <button
               onClick={() => setMode("advanced")}
-              className={`px-3 py-2 text-sm ${mode === "advanced" ? "bg-gray-200" : "bg-white"}`}
+              className={`px-3 py-2 text-sm ${mode === "advanced" ? "bg-gray-200 dark:bg-gray-600" : "bg-white dark:bg-gray-700 dark:text-white"}`}
               title="Show all columns"
             >
               Advanced
             </button>
           </div>
-          <div className="inline-flex rounded border overflow-hidden">
+          <div className="inline-flex rounded border dark:border-gray-600 overflow-hidden">
             <button
               onClick={() => setDensity("comfortable")}
-              className={`px-3 py-2 text-sm ${density === "comfortable" ? "bg-gray-200" : "bg-white"}`}
+              className={`px-3 py-2 text-sm ${density === "comfortable" ? "bg-gray-200 dark:bg-gray-600" : "bg-white dark:bg-gray-700 dark:text-white"}`}
               title="Comfortable spacing"
             >
               Cozy
             </button>
             <button
               onClick={() => setDensity("compact")}
-              className={`px-3 py-2 text-sm ${density === "compact" ? "bg-gray-200" : "bg-white"}`}
+              className={`px-3 py-2 text-sm ${density === "compact" ? "bg-gray-200 dark:bg-gray-600" : "bg-white dark:bg-gray-700 dark:text-white"}`}
               title="Compact rows"
             >
               Dense
@@ -444,10 +444,10 @@ function HostsTable({ showDuplicates = false, onClearPreset }) {
 
       {showDuplicates && (
         <div className="mb-2 ml-2 text-sm">
-          <span className="inline-flex items-center gap-2 px-2 py-1 rounded bg-yellow-100 text-yellow-900 border border-yellow-300">
+          <span className="inline-flex items-center gap-2 px-2 py-1 rounded bg-yellow-100 dark:bg-yellow-900 text-yellow-900 dark:text-yellow-100 border border-yellow-300 dark:border-yellow-700">
             Showing duplicate IPs
             <button
-              className="underline text-blue-700"
+              className="underline text-blue-700 dark:text-blue-300"
               onClick={() => onClearPreset?.()}
             >
               Clear
@@ -457,12 +457,12 @@ function HostsTable({ showDuplicates = false, onClearPreset }) {
       )}
 
       {/* Table container: independent scrollbars; enable horizontal scroll for advanced columns, fill available height */}
-      <div className="relative flex-1 min-h-0 overflow-x-auto overflow-y-auto rounded border border-gray-200">
+      <div className="relative flex-1 min-h-0 overflow-x-auto overflow-y-auto rounded border border-gray-200 dark:border-gray-700">
         <div className="min-w-0">
           {/* Grid header */}
           <div
             role="row"
-            className={`grid gap-0 items-stretch bg-gray-100 sticky top-0`}
+            className={`grid gap-0 items-stretch bg-gray-100 dark:bg-gray-700 sticky top-0`}
             style={{
               gridTemplateColumns,
               minWidth: `${minGridWidth}px`,
@@ -475,7 +475,7 @@ function HostsTable({ showDuplicates = false, onClearPreset }) {
                   key={col}
                   role="columnheader"
                   aria-label={colTitles[col]}
-                  className={`${thBase} ${thH} border-r border-gray-200 ${isLast ? "last:border-r-0" : ""} flex items-center`}
+                  className={`${thBase} ${thH} border-r border-gray-200 dark:border-gray-600 ${isLast ? "last:border-r-0" : ""} flex items-center`}
                   style={{ position: "relative", minHeight: "32px", padding: "8px" }}
                 >
                   <div
@@ -497,13 +497,13 @@ function HostsTable({ showDuplicates = false, onClearPreset }) {
                         colTitle={colTitles[col]}
                       />
                     ) : (
-                      <div className="flex items-center gap-1 w-full h-full cursor-pointer hover:bg-blue-50 rounded px-1 py-1"
+                      <div className="flex items-center gap-1 w-full h-full cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900 rounded px-1 py-1"
                         title={`Click to filter by ${colTitles[col]}`}>
                         <svg width="16" height="16" viewBox="0 0 20 20" fill="none"
                           className="inline mr-1 opacity-70"
                           style={{ marginRight: "4px" }}>
-                          <circle cx="9" cy="9" r="7" stroke="#333" strokeWidth="2" />
-                          <line x1="15" y1="15" x2="19" y2="19" stroke="#333" strokeWidth="2" />
+                          <circle cx="9" cy="9" r="7" stroke="currentColor" strokeWidth="2" />
+                          <line x1="15" y1="15" x2="19" y2="19" stroke="currentColor" strokeWidth="2" />
                         </svg>
                         <span className="font-semibold">{colTitles[col]}</span>
                       </div>
@@ -517,7 +517,7 @@ function HostsTable({ showDuplicates = false, onClearPreset }) {
           {/* Rows as grid lines */}
           <div role="rowgroup">
             {displayRows.length === 0 ? (
-              <div className="p-6 text-center text-gray-500">No data.</div>
+              <div className="p-6 text-center text-gray-500 dark:text-gray-400">No data.</div>
             ) : (
               displayRows.map((r) => {
                 const key = r.group === "docker" && r.container_id
@@ -527,7 +527,7 @@ function HostsTable({ showDuplicates = false, onClearPreset }) {
                   <div
                     key={key}
                     role="row"
-                    className={`grid gap-0 items-start even:bg-white odd:bg-gray-50`}
+                    className={`grid gap-0 items-start even:bg-white dark:even:bg-gray-800 odd:bg-gray-50 dark:odd:bg-gray-750`}
                     style={{ gridTemplateColumns, minWidth: `${minGridWidth}px` }}
                   >
                     {visibleColumns.map((col, idx) => {
@@ -535,23 +535,23 @@ function HostsTable({ showDuplicates = false, onClearPreset }) {
                       let content;
                       if (col === "os") {
                         content = (
-                          <span className={`block truncate ${(!r.os || /^unknown$/i.test(r.os)) ? "text-gray-400" : ""}`} title={r.os || "—"}>
+                          <span className={`block truncate ${(!r.os || /^unknown$/i.test(r.os)) ? "text-gray-400 dark:text-gray-500" : "dark:text-gray-200"}`} title={r.os || "—"}>
                             {r.os && !/^unknown$/i.test(r.os) ? r.os : "—"}
                           </span>
                         );
                       } else if (col === "mac") {
                         content = (
-                          <span className={`block whitespace-nowrap ${(!r.mac || /^unknown$/i.test(r.mac)) ? "text-gray-400" : ""}`} title={r.mac || "—"}>
+                          <span className={`block whitespace-nowrap ${(!r.mac || /^unknown$/i.test(r.mac)) ? "text-gray-400 dark:text-gray-500" : "dark:text-gray-200"}`} title={r.mac || "—"}>
                             {r.mac && !/^unknown$/i.test(r.mac) ? r.mac : "—"}
                           </span>
                         );
                       } else if (col === "group") {
                         content = (
-                          <span className="capitalize">{r.group}</span>
+                          <span className="capitalize dark:text-gray-200">{r.group}</span>
                         );
                       } else if (col === "ports") {
                         content = (
-                          <div title={r.ports} className="min-w-0">
+                          <div title={r.ports} className="min-w-0 dark:text-gray-200">
                             <div
                               className="block"
                               style={{
@@ -567,23 +567,23 @@ function HostsTable({ showDuplicates = false, onClearPreset }) {
                         );
                       } else if (col === "nextHop") {
                         content = (
-                          <span className={`block truncate ${(!r.nextHop || /^unknown$/i.test(r.nextHop) || r.nextHop === "unavailable") ? "text-gray-400" : ""}`} title={r.nextHop || "—"}>
+                          <span className={`block truncate ${(!r.nextHop || /^unknown$/i.test(r.nextHop) || r.nextHop === "unavailable") ? "text-gray-400 dark:text-gray-500" : "dark:text-gray-200"}`} title={r.nextHop || "—"}>
                             {r.nextHop && !/^unknown$/i.test(r.nextHop) && r.nextHop !== "unavailable" ? r.nextHop : "—"}
                           </span>
                         );
                       } else if (col === "subnet") {
-                        content = r.subnet || <span className="text-gray-400">—</span>;
+                        content = r.subnet ? <span className="dark:text-gray-200">{r.subnet}</span> : <span className="text-gray-400 dark:text-gray-500">—</span>;
                       } else if (col === "network") {
                         content = (
-                          <span className={`block truncate ${(!r.network || /^unknown$/i.test(r.network)) ? "text-gray-400" : ""}`} title={r.network || "—"}>
+                          <span className={`block truncate ${(!r.network || /^unknown$/i.test(r.network)) ? "text-gray-400 dark:text-gray-500" : "dark:text-gray-200"}`} title={r.network || "—"}>
                             {r.network && !/^unknown$/i.test(r.network) ? r.network : "—"}
                           </span>
                         );
                       } else if (col === "lastSeen") {
-                        content = fmtLastSeen(r.lastSeen);
+                        content = <span className="dark:text-gray-200">{fmtLastSeen(r.lastSeen)}</span>;
                       } else if (col === "online_status") {
                         content = (
-                          <span className={`block truncate ${(!r.online_status || /^unknown$/i.test(r.online_status)) ? "text-gray-400" : ""}`}>
+                          <span className={`block truncate ${(!r.online_status || /^unknown$/i.test(r.online_status)) ? "text-gray-400 dark:text-gray-500" : "dark:text-gray-200"}`}>
                             {r.online_status && !/^unknown$/i.test(r.online_status) ? r.online_status : "—"}
                           </span>
                         );
@@ -598,26 +598,26 @@ function HostsTable({ showDuplicates = false, onClearPreset }) {
                               className={`inline-block h-6 w-1 rounded ${statusColor}`}
                               style={{ minWidth: "4px", marginRight: "8px" }}
                             />
-                            <span className="min-w-0 block truncate" title={r.name}>
+                            <span className="min-w-0 block truncate dark:text-gray-200" title={r.name}>
                               {r.name}
                             </span>
                           </div>
                         );
                       } else if (col === "ip") {
                         content = (
-                          <span className="whitespace-nowrap font-mono" title={r.ip}>
+                          <span className="whitespace-nowrap font-mono dark:text-gray-200" title={r.ip}>
                             {r.ip}
                           </span>
                         );
                       } else {
-                        content = r[col] ?? "—";
+                        content = <span className="dark:text-gray-200">{r[col] ?? "—"}</span>;
                       }
 
                       return (
                         <div
                           key={col}
                           role="cell"
-                          className={`${tdBase} ${rowH} border-r border-gray-200 ${isLast ? "last:border-r-0" : ""}`}
+                          className={`${tdBase} ${rowH} border-r border-gray-200 dark:border-gray-700 ${isLast ? "last:border-r-0" : ""}`}
                           style={{ padding: "12px 12px" }}
                           title={typeof content === "string" ? content : undefined}
                         >
