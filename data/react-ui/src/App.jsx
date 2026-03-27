@@ -1,8 +1,8 @@
-import React, { useMemo, useRef, useEffect, useState } from "react";
+import React, { useRef, useEffect, useState } from "react";
 import { NetworkMap } from "./components/NetworkMap";
-import { HostsTable } from "./components/HostsTable";
 import { ScriptsPanel } from "./components/ScriptsPanel";
 import { LogsPanel } from "./components/LogsPanel";
+import { ServicesPanel } from "./components/ServicesPanel";
 import { useNetworkStats } from "./hooks/useNetworkStats";
 import { apiGet, getAuthToken } from "./api";
 import BuildTag from "./components/BuildTag";
@@ -11,32 +11,49 @@ import LoginModal from "./components/LoginModal";
 import ThemeToggle from "./components/ThemeToggle";
 import { getInitialTheme, setThemeCookie, resolveTheme, applyTheme, getSystemTheme } from "./theme/themeUtils";
 
-const tabs = ["Network Map", "Hosts Table", "Scripts", "Logs"];
+const tabs = ["服务管理", "网络拓扑", "扫描任务", "系统日志"];
+
+// tab 名称 → 组件 key 映射
+const TAB_KEY = {
+  "服务管理": "Services",
+  "网络拓扑": "Network Map",
+  "扫描任务": "Scripts",
+  "系统日志": "Logs",
+};
 
 // Simple inline SVG icons (no external deps)
 function TabIcon({ tab, className = "w-6 h-6" }) {
   const common = "fill-current";
   switch (tab) {
-    case "Network Map":
+    case "服务管理":
       return (
-        <svg viewBox="0 0 24 24" className={`${className} ${common}`}> 
+        <svg viewBox="0 0 24 24" className={`${className} ${common}`}>
+          <rect x="3" y="3" width="8" height="8" rx="1" fill="none" stroke="currentColor" strokeWidth="1.5"/>
+          <rect x="13" y="3" width="8" height="8" rx="1" fill="none" stroke="currentColor" strokeWidth="1.5"/>
+          <rect x="3" y="13" width="8" height="8" rx="1" fill="none" stroke="currentColor" strokeWidth="1.5"/>
+          <rect x="13" y="13" width="8" height="8" rx="1" fill="none" stroke="currentColor" strokeWidth="1.5"/>
+        </svg>
+      );
+    case "网络拓扑":
+      return (
+        <svg viewBox="0 0 24 24" className={`${className} ${common}`}>
           <path d="M6 3a3 3 0 1 1 0 6 3 3 0 0 1 0-6Zm12 12a3 3 0 1 1 0 6 3 3 0 0 1 0-6ZM6 15a3 3 0 1 1 0 6 3 3 0 0 1 0-6Zm12-12a3 3 0 1 1 0 6 3 3 0 0 1 0-6ZM8.5 7.5l7 9M8.5 16.5l7-9" stroke="currentColor" strokeWidth="1.5" fill="none"/>
         </svg>
       );
-    case "Hosts Table":
+    case "主机列表":
       return (
         <svg viewBox="0 0 24 24" className={`${className} ${common}`}>
           <path d="M3 5h18v4H3zM3 10.5h18M3 15h18M3 19h18" stroke="currentColor" strokeWidth="1.5" fill="none"/>
         </svg>
       );
-    case "Scripts":
+    case "扫描任务":
       return (
         <svg viewBox="0 0 24 24" className={`${className} ${common}`}>
           <path d="M5 4h10l4 4v12H5z" fill="none" stroke="currentColor" strokeWidth="1.5"/>
           <path d="M9 13l-3 3 3 3M12 19h5" stroke="currentColor" strokeWidth="1.5" fill="none"/>
         </svg>
       );
-    case "Logs":
+    case "系统日志":
       return (
         <svg viewBox="0 0 24 24" className={`${className} ${common}`}>
           <path d="M4 5h16v14H4z" fill="none" stroke="currentColor" strokeWidth="1.5"/>
@@ -48,7 +65,7 @@ function TabIcon({ tab, className = "w-6 h-6" }) {
   }
 }
 
-function Sidebar({ activeTab, setActiveTab, visible, setVisible, onShowDuplicates }) {
+function Sidebar({ activeTab, setActiveTab, visible, setVisible }) {
   const stats = useNetworkStats();
   const sidebarRef = useRef(null);
 
@@ -132,29 +149,20 @@ function Sidebar({ activeTab, setActiveTab, visible, setVisible, onShowDuplicate
 
         {/* Stats (hidden on desktop when collapsed) */}
         <div className={`mt-auto text-sm pt-6 border-t border-gray-700 dark:border-gray-600 px-4 ${visible ? "lg:block" : "lg:hidden"}`}>
-          <h2 className="font-semibold mb-1">Network Stats:</h2>
-          <p>Total Hosts: {stats.total}</p>
+          <h2 className="font-semibold mb-1">网络统计</h2>
+          <p>主机总数：{stats.total}</p>
           <p>
-            Docker Hosts: {stats.docker}{" "}
+            容器主机：{stats.docker}{" "}
             <span className="text-xs ml-1">
-              (<span className="text-green-400">{stats.dockerRunning} </span>,{" "}
-              <span className="text-red-400">{stats.dockerStopped} </span>)
+              (<span className="text-green-400">{stats.dockerRunning} 运行</span>，{" "}
+              <span className="text-red-400">{stats.dockerStopped} 停止</span>)
             </span>
           </p>
-          <p>Normal Hosts: {stats.normal}</p>
-          <p>Unique Subnets: {stats.subnets}</p>
-          <p>
-            Duplicate IPs: {" "}
-            <button
-              className="underline text-blue-300 hover:text-blue-200"
-              title="Show duplicate IPs in Hosts table"
-              onClick={() => onShowDuplicates?.()}
-            >
-              {stats.duplicateIps}
-            </button>
-          </p>
+          <p>普通主机：{stats.normal}</p>
+          <p>子网数量：{stats.subnets}</p>
+          <p>重复 IP：{stats.duplicateIps}</p>
           {stats.updatedAt && (
-            <p className="mt-2 text-gray-400 italic">Updated: {stats.updatedAt}</p>
+            <p className="mt-2 text-gray-400 italic">更新于：{stats.updatedAt}</p>
           )}
         </div>
 
@@ -164,12 +172,11 @@ function Sidebar({ activeTab, setActiveTab, visible, setVisible, onShowDuplicate
 }
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState("Network Map");
+  const [activeTab, setActiveTab] = useState("服务管理");
   const [selectedNode, setSelectedNode] = useState(null);
   // Default: collapsed on desktop, hidden on mobile
   const [sidebarVisible, setSidebarVisible] = useState(false);
   const [loginVisible, setLoginVisible] = useState(false);
-  const [hostsShowDuplicates, setHostsShowDuplicates] = useState(false);
   const githubUrl = "https://github.com/karam-ajaj/atlas";
 
   const [authState, setAuthState] = useState({ checked: false, enabled: false, authenticated: false });
@@ -288,9 +295,8 @@ export default function App() {
     if (!authState.checked) return;
     if (authState.authenticated) return;
 
-    setActiveTab("Network Map");
+    setActiveTab("服务管理");
     setSelectedNode(null);
-    setHostsShowDuplicates(false);
     setSidebarVisible(false);
   }, [authState.checked, authState.enabled, authState.authenticated]);
 
@@ -337,62 +343,39 @@ export default function App() {
           setActiveTab={setActiveTab}
           visible={sidebarVisible}
           setVisible={setSidebarVisible}
-          onShowDuplicates={() => {
-            setActiveTab("Hosts Table");
-            setHostsShowDuplicates(true);
-          }}
         />
 
-        <div className="flex-1 p-6 overflow-hidden flex flex-col">
-          {/* Top bar */}
-          <div className="flex items-center justify-between mb-4 shrink-0">
-            {/* Left placeholder (kept intentionally empty) */}
-            <div />
-
-            {/* Right: theme toggle + GitHub + login button (desktop) */}
-            <div className="flex items-center gap-2">
-              <ThemeToggle themePreference={themePreference} setThemePreference={setThemePreference} />
-              <a
-                href={githubUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="hidden lg:inline-flex bg-transparent text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white p-2 rounded-md"
-                title="View on GitHub"
-                aria-label="View on GitHub"
-              >
-                <svg viewBox="0 0 24 24" className="w-6 h-6 fill-current" role="img" aria-hidden="true">
-                  <path d="M12 2c-5.5 0-10 4.5-10 10 0 4.4 2.9 8.2 6.9 9.5.5.1.7-.2.7-.5v-2c-2.8.6-3.4-1.2-3.4-1.2-.5-1.2-1.1-1.5-1.1-1.5-.9-.6.1-.6.1-.6 1 .1 1.5 1 1.5 1 .9 1.5 2.4 1.1 3 .8.1-.7.4-1.1.6-1.4-2.2-.2-4.6-1.1-4.6-5 0-1.1.4-2 1-2.7-.1-.2-.4-1.3.1-2.7 0 0 .8-.3 2.8 1a9.4 9.4 0 0 1 5 0c2-1.3 2.8-1 2.8-1 .5 1.4.2 2.5.1 2.7.6.7 1 1.6 1 2.7 0 3.9-2.3 4.8-4.6 5 .4.3.7.9.7 1.8v2.7c0 .3.2.6.7.5A10 10 0 0 0 22 12c0-5.5-4.5-10-10-10z" />
-                </svg>
-              </a>
-              <button
-                className="hidden lg:inline-flex bg-transparent text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white p-2 rounded-md"
-                title="Login"
-                aria-label="Login"
-                onClick={openLogin}
-              >
-                <svg viewBox="0 0 24 24" className="w-6 h-6 fill-current" role="img" aria-hidden="true">
-                  <circle cx="12" cy="8" r="4" fill="currentColor" />
-                  <path d="M4 20c0-4 3.6-7.3 8-7.3s8 3.3 8 7.3" stroke="currentColor" strokeWidth="2" fill="none" />
-                </svg>
-              </button>
+        <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+          {/* Top bar — only show on non-Services tabs to save space */}
+          {activeTab !== "服务管理" && (
+            <div className="flex items-center justify-end px-6 pt-4 pb-2 shrink-0">
+              <div className="flex items-center gap-2">
+                <ThemeToggle themePreference={themePreference} setThemePreference={setThemePreference} />
+                <a href={githubUrl} target="_blank" rel="noreferrer"
+                  className="hidden lg:inline-flex text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white p-2 rounded-md"
+                  title="GitHub" aria-label="GitHub">
+                  <svg viewBox="0 0 24 24" className="w-5 h-5 fill-current" aria-hidden="true">
+                    <path d="M12 2c-5.5 0-10 4.5-10 10 0 4.4 2.9 8.2 6.9 9.5.5.1.7-.2.7-.5v-2c-2.8.6-3.4-1.2-3.4-1.2-.5-1.2-1.1-1.5-1.1-1.5-.9-.6.1-.6.1-.6 1 .1 1.5 1 1.5 1 .9 1.5 2.4 1.1 3 .8.1-.7.4-1.1.6-1.4-2.2-.2-4.6-1.1-4.6-5 0-1.1.4-2 1-2.7-.1-.2-.4-1.3.1-2.7 0 0 .8-.3 2.8 1a9.4 9.4 0 0 1 5 0c2-1.3 2.8-1 2.8-1 .5 1.4.2 2.5.1 2.7.6.7 1 1.6 1 2.7 0 3.9-2.3 4.8-4.6 5 .4.3.7.9.7 1.8v2.7c0 .3.2.6.7.5A10 10 0 0 0 22 12c0-5.5-4.5-10-10-10z"/>
+                  </svg>
+                </a>
+                <button onClick={openLogin}
+                  className="hidden lg:inline-flex text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white p-2 rounded-md"
+                  title="登录" aria-label="登录">
+                  <svg viewBox="0 0 24 24" className="w-5 h-5 fill-current" aria-hidden="true">
+                    <circle cx="12" cy="8" r="4" fill="currentColor"/>
+                    <path d="M4 20c0-4 3.6-7.3 8-7.3s8 3.3 8 7.3" stroke="currentColor" strokeWidth="2" fill="none"/>
+                  </svg>
+                </button>
+              </div>
             </div>
-          </div>
+          )}
 
-          {/* Content area fills remaining height; individual tabs handle their own internal scroll */}
-          <div className="w-full h-full flex-1 min-h-0">
-            {activeTab === "Network Map" && (
-              <NetworkMap onNodeSelect={setSelectedNode} selectedNode={selectedNode} />
-            )}
-            {activeTab === "Hosts Table" && (
-              <HostsTable
-                selectedNode={selectedNode}
-                onSelectNode={setSelectedNode}
-                showDuplicates={hostsShowDuplicates}
-                onClearPreset={() => setHostsShowDuplicates(false)}
-              />
-            )}
-            {activeTab === "Scripts" && <ScriptsPanel />}
-            {activeTab === "Logs" && <LogsPanel />}
+          {/* Content — full height for Services, padded for others */}
+          <div className={`flex-1 min-h-0 ${activeTab !== "服务管理" ? "px-6 pb-6" : ""}`}>
+            {activeTab === "服务管理" && <ServicesPanel />}
+            {activeTab === "网络拓扑" && <NetworkMap onNodeSelect={setSelectedNode} selectedNode={selectedNode} />}
+            {activeTab === "扫描任务" && <ScriptsPanel />}
+            {activeTab === "系统日志" && <LogsPanel />}
           </div>
         </div>
       </div>

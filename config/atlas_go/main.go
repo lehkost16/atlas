@@ -36,6 +36,18 @@ func main() {
             log.Fatalf("❌ Deep scan failed: %v", err)
         }
         fmt.Println("✅ Deep scan complete.")
+    case "servicescan":
+        if len(os.Args) < 4 {
+            log.Fatalf("Usage: ./atlas servicescan <ip> <mac>")
+        }
+        ip := os.Args[2]
+        mac := os.Args[3]
+        fmt.Printf("🔍 Scanning services on %s (%s)...\n", ip, mac)
+        err := scan.ServiceScan(ip, mac)
+        if err != nil {
+            log.Fatalf("❌ Service scan failed: %v", err)
+        }
+        fmt.Println("✅ Service scan complete.")
     case "initdb":
         fmt.Println("📦 Initializing database...")
         err := db.InitDB()

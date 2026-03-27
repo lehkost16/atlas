@@ -157,6 +157,14 @@ export function apiPut(path, options = {}) {
   return apiRequest("PUT", path, options);
 }
 
+export function apiPatch(path, options = {}) {
+  return apiRequest("PATCH", path, options);
+}
+
+export function apiDelete(path, options = {}) {
+  return apiRequest("DELETE", path, options);
+}
+
 // Streaming (SSE) URL builder
 export function sseUrl(path) {
   const raw = buildUrl(path);
@@ -177,6 +185,13 @@ export function sseUrl(path) {
 export const AtlasAPI = {
   getHosts: () => apiGet("/hosts"),
   getExternal: () => apiGet("/external"),
+  getDevices: () => apiGet("/devices"),
+  getDevice: (mac) => apiGet(`/devices/${mac}`),
+  getDeviceServices: (mac) => apiGet(`/devices/${mac}/services`),
+  getServices: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return apiGet(`/services${qs ? "?" + qs : ""}`);
+  },
   listLogs: () => apiGet("/logs/list"),
   getLog: (filename) => apiGet(`/logs/${encodeURIComponent(filename)}`),
   lastScanStatus: () => apiGet("/scripts/last-scan-status"),

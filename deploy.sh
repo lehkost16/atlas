@@ -68,53 +68,28 @@ fi
 
 # Sanity checks
 command -v docker >/dev/null 2>&1 || { echo "❌ docker is not installed or not in PATH"; exit 1; }
-command -v npm >/dev/null 2>&1 || { echo "❌ npm is not installed or not in PATH"; exit 1; }
 [[ -d "$UI_DIR" ]] || { echo "❌ React UI directory not found at: $UI_DIR"; exit 1; }
 
 echo "📦 Starting deployment for version: $VERSION"
 
-# Step 1: Build React UI from repo's data/react-ui
-echo "🛠️ Building React UI..."
-pushd "$UI_DIR" >/dev/null
-if [[ -f package-lock.json ]]; then
-  npm ci
-else
-  npm install
-fi
-npm run build
-popd >/dev/null
-
-# Step 2: Copy UI build output to data/html (used by Dockerfile)
-echo "📂 Copying UI build to data/html..."
-mkdir -p "$HTML_DIR"
-rm -rf "${HTML_DIR:?}/"* 2>/dev/null || true
-cp -r "$UI_DIR/dist/"* "$HTML_DIR/"
-
-# Step 2b: Write build-info.json for the UI to display
+# Step 1: Write build-info.json (baked into the image via Dockerfile ui-builder stage)
 echo "📝 Writing build-info.json..."
 COMMIT_SHA="$(git -C "$REPO_ROOT" rev-parse --short HEAD 2>/dev/null || echo 'dirty')"
 BUILD_TIME="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
-cat > "${HTML_DIR}/build-info.json" <<EOF
+mkdir -p "$UI_DIR/public"
+cat > "${UI_DIR}/public/build-info.json" <<EOF
 { "version": "${VERSION}", "commit": "${COMMIT_SHA}", "builtAt": "${BUILD_TIME}" }
 EOF
 
-# Step 3: Stop and remove existing container if present
+# Step 2: Stop and remove existing container if present
 echo "🧹 Removing existing '$CONTAINER_NAME' container if running..."
 docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
 
-# Step 4: (Optional) backup disabled by default. Enable by exporting RUN_BACKUP=1
-if [[ "${RUN_BACKUP:-0}" == "1" && -x "/home/karam/atlas-repo-backup.sh" ]]; then
-  echo "🗃️ Running backup script..."
-  /home/karam/atlas-repo-backup.sh || echo "⚠️ Backup script returned non-zero exit; continuing..."
-else
-  echo "ℹ️ Skipping backup (set RUN_BACKUP=1 to enable and ensure script exists)"
-fi
-
-# Step 5: Build Docker image from repo root
+# Step 3: Build Docker image (React + Go built inside Docker)
 echo "🐳 Building Docker image: $IMAGE:$VERSION"
 DOCKER_BUILDKIT=1 docker build -t "$IMAGE:$VERSION" "$REPO_ROOT"
 
-# Step 5b: Optionally tag as latest
+# Step 4: Optionally tag as latest
 if $DO_LATEST; then
   echo "🔄 Tagging Docker image as latest"
   docker tag "$IMAGE:$VERSION" "$IMAGE:latest"
@@ -122,10 +97,9 @@ else
   echo "⏭️ Skipping 'latest' tag per selection"
 fi
 
-# Step 6: Push image(s) to Docker Hub
+# Step 5: Push image(s) to Docker Hub
 if ! $DO_PUSH; then
   echo "⏭️ Skipping Docker push as requested"
-  # exit 0
 else
   echo "📤 Pushing Docker image(s) to Docker Hub..."
   docker push "$IMAGE:$VERSION"
@@ -134,7 +108,7 @@ else
   fi
 fi
 
-# Step 7: Run new container
+# Step 6: Run new container
 echo "🚀 Deploying container..."
 docker run -d \
   --name "$CONTAINER_NAME" \

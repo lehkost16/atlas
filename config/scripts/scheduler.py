@@ -26,8 +26,8 @@ DEFAULT_INTERVALS = {
 }
 
 # Configuration file path
-CONFIG_FILE = "/config/db/scheduler_config.json"
-LOGS_DIR = "/config/logs"
+CONFIG_FILE = "config/db/scheduler_config.json"
+LOGS_DIR = "config/logs"
 
 
 class ScanScheduler:

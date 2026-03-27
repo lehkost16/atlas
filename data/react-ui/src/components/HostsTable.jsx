@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState, useRef } from "react";
-import { apiGet } from "../api";
+import { apiGet, apiPost } from "../api";
+import { AddDeviceModal } from "./AddDeviceModal";
 
 function ipToNum(ip) {
   const m = (ip || "").match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
@@ -206,6 +207,17 @@ function HostsTable({ showDuplicates = false, onClearPreset }) {
   const [density, setDensity] = useState("comfortable");
   const [filters, setFilters] = useState({});
   const [filteringCol, setFilteringCol] = useState(null);
+  const [showAddDevice, setShowAddDevice] = useState(false);
+
+  const reload = () => {
+    apiGet("/hosts")
+      .then((json) => {
+        const hostsRows = Array.isArray(json?.[0]) ? json[0] : [];
+        const dockerRows = Array.isArray(json?.[1]) ? json[1] : [];
+        setRaw({ hosts: hostsRows, docker: dockerRows });
+      })
+      .catch(() => setRaw({ hosts: [], docker: [] }));
+  };
 
   useEffect(() => {
     let abort = false;
@@ -430,6 +442,12 @@ function HostsTable({ showDuplicates = false, onClearPreset }) {
           >
             Export
           </button>
+          <button
+            onClick={() => setShowAddDevice(true)}
+            className="px-3 py-2 rounded bg-emerald-600 text-white hover:bg-emerald-700"
+          >
+            + Add Host
+          </button>
         </div>
       </div>
 
@@ -632,6 +650,12 @@ function HostsTable({ showDuplicates = false, onClearPreset }) {
           </div>
         </div>
       </div>
+      {showAddDevice && (
+        <AddDeviceModal
+          onClose={() => setShowAddDevice(false)}
+          onAdded={reload}
+        />
+      )}
     </div>
   );
 }

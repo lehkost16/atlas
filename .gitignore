@@ -1,8 +1,12 @@
 # Build and UI output
-data/html/*
-!data/html/build-info.json
+data/html/
 data/react-ui/dist/
 data/react-ui/node_modules/
+
+# Python virtualenv
+config/scripts/venv/
+config/scripts/.venv/
+config/scripts/__pycache__/
 
 # Runtime logs and state
 config/logs/
@@ -12,11 +16,11 @@ config/db/
 
 # Go build output and binaries
 config/bin/
+config/atlas_go/atlas
 *.exe
 *.out
 
 # Node modules, env, OS junk
-data/react-ui/node_modules
 .env
 .DS_Store
 
@@ -28,14 +32,7 @@ data/react-ui/node_modules
 *~
 *.orig
 
-# Archives (optional)
+# Archives
 *.tar
 *.tar.gz
 *.zip
-
-
-# Ignore Python bytecode
-config/scripts/__pycache__/
-
-# Ignore Go compiled binary
-config/atlas_go/atlas
