@@ -412,8 +412,11 @@ func DeepScan() error {
 	}
 	defer dbConn.Close()
 
-	_, _ = dbConn.Exec("UPDATE hosts SET online_status = 'offline'")
-	_, _ = dbConn.Exec("UPDATE devices SET online_status = 'offline'")
+	// Don't mark all offline upfront — mark only hosts not found in this scan after completion
+	discoveredIPs := make(map[string]bool)
+	for _, h := range hostInfos {
+		discoveredIPs[h.IP] = true
+	}
 
 	var wg sync.WaitGroup
 	for idx, host := range hostInfos {
@@ -484,6 +487,20 @@ func DeepScan() error {
 		}(idx, host)
 	}
 	wg.Wait()
+
+	// After scan completes, mark hosts not found in this scan as offline
+	rows, _ := dbConn.Query("SELECT current_ip FROM devices")
+	if rows != nil {
+		for rows.Next() {
+			var ip string
+			rows.Scan(&ip)
+			if ip != "" && !discoveredIPs[ip] {
+				dbConn.Exec("UPDATE devices SET online_status='offline' WHERE current_ip=?", ip)
+				dbConn.Exec("UPDATE hosts SET online_status='offline' WHERE ip=?", ip)
+			}
+		}
+		rows.Close()
+	}
 
 	fmt.Fprintf(lf, "Deep scan complete in %s\n", time.Since(startTime))
 	return nil

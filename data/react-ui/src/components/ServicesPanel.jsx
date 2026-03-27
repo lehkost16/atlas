@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useCallback, useRef } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { apiGet, apiPatch, apiDelete, apiPost } from "../api";
 import { AddDeviceModal } from "./AddDeviceModal";
 import { AddServiceModal } from "./AddServiceModal";
@@ -222,36 +222,36 @@ function DeviceCard({ device, onIgnore, onTagSaved, onAddService, onDelete, onRe
   );
 }
 
-// ── 分组组件（可展开收起 + 拖动排序） ────────────────────────────────────────
-function DeviceGroup({ groupName, devices, collapsed, onToggle, onDragStart, onDragOver, onDrop, cardProps }) {
+// ── 分组组件（可展开收起 + 排序模式） ────────────────────────────────────────
+function DeviceGroup({ groupName, devices, collapsed, onToggle, sortMode, onMoveUp, onMoveDown, isFirst, isLast, cardProps }) {
   return (
-    <div
-      draggable
-      onDragStart={onDragStart}
-      onDragOver={onDragOver}
-      onDrop={onDrop}
-      className="rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden bg-white dark:bg-gray-800 shadow-sm"
-    >
-      {/* 分组标题栏 */}
-      <div
-        className="flex items-center gap-3 px-5 py-3.5 cursor-pointer select-none hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors"
-        onClick={onToggle}
-      >
-        <span className="text-gray-400 dark:text-gray-500 text-sm transition-transform duration-200"
-          style={{ display: "inline-block", transform: collapsed ? "rotate(-90deg)" : "rotate(0deg)" }}>▼</span>
-        <span className={`inline-block px-3 py-1 rounded-full text-sm font-semibold ${tagColor(groupName)}`}>
-          {groupName}
-        </span>
-        <span className="text-sm text-gray-400 dark:text-gray-500">{devices.length} 台</span>
-        <span className="ml-auto text-gray-300 dark:text-gray-600 cursor-grab text-lg" title="拖动排序">⠿</span>
+    <div className="rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden bg-white dark:bg-gray-800 shadow-sm">
+      <div className="flex items-center gap-3 px-5 py-3.5 hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors">
+
+        {/* 排序按钮 */}
+        {sortMode && (
+          <div className="flex flex-col gap-0.5 shrink-0">
+            <button onClick={onMoveUp} disabled={isFirst}
+              className="text-xs text-gray-400 hover:text-blue-600 disabled:opacity-20 leading-none px-1">▲</button>
+            <button onClick={onMoveDown} disabled={isLast}
+              className="text-xs text-gray-400 hover:text-blue-600 disabled:opacity-20 leading-none px-1">▼</button>
+          </div>
+        )}
+
+        {/* 展开/收起 */}
+        <div className="flex items-center gap-3 flex-1 cursor-pointer select-none" onClick={onToggle}>
+          <span className="text-gray-400 dark:text-gray-500 text-sm transition-transform duration-200"
+            style={{ display: "inline-block", transform: collapsed ? "rotate(-90deg)" : "rotate(0deg)" }}>▼</span>
+          <span className={`inline-block px-3 py-1 rounded-full text-sm font-semibold ${tagColor(groupName)}`}>
+            {groupName}
+          </span>
+          <span className="text-sm text-gray-400 dark:text-gray-500">{devices.length} 台</span>
+        </div>
       </div>
 
-      {/* 设备列表 */}
       {!collapsed && (
         <div className="px-4 pb-4 space-y-3 border-t border-gray-100 dark:border-gray-700/50 pt-3">
-          {devices.map(d => (
-            <DeviceCard key={d.mac} device={d} {...cardProps(d)} />
-          ))}
+          {devices.map(d => <DeviceCard key={d.mac} device={d} {...cardProps(d)} />)}
         </div>
       )}
     </div>
@@ -286,7 +286,7 @@ export function ServicesPanel() {
   const [collapsed, setCollapsed] = useState({});
   // 分组顺序
   const [groupOrder, setGroupOrder] = useState([]);
-  const dragGroup = useRef(null);
+  const [sortMode, setSortMode] = useState(false);
 
   const fetchDevices = useCallback(async (quiet = false) => {
     if (!quiet) setRefreshing(true);
@@ -420,21 +420,17 @@ export function ServicesPanel() {
     onDeleteService: handleDeleteService,
   }), [handleIgnore, handleTagSaved, handleDelete, handleRefreshed, handleDeleteService]);
 
-  // 拖动排序
-  const handleDragStart = (groupName) => { dragGroup.current = groupName; };
-  const handleDragOver = (e) => { e.preventDefault(); };
-  const handleDrop = (targetGroup) => {
-    if (!dragGroup.current || dragGroup.current === targetGroup) return;
+  // 分组排序
+  const moveGroup = (groupName, dir) => {
     setGroupOrder(prev => {
       const arr = [...prev];
-      const from = arr.indexOf(dragGroup.current);
-      const to = arr.indexOf(targetGroup);
-      if (from === -1 || to === -1) return arr;
-      arr.splice(from, 1);
-      arr.splice(to, 0, dragGroup.current);
+      const idx = arr.indexOf(groupName);
+      if (idx === -1) return arr;
+      const newIdx = idx + dir;
+      if (newIdx < 0 || newIdx >= arr.length) return arr;
+      [arr[idx], arr[newIdx]] = [arr[newIdx], arr[idx]];
       return arr;
     });
-    dragGroup.current = null;
   };
 
   return (
@@ -461,6 +457,10 @@ export function ServicesPanel() {
             <button onClick={() => setShowAddService(true)} className="px-4 py-2 rounded-lg text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 transition-colors">+ 服务</button>
             <button onClick={() => setShowAddDevice(true)} className="px-4 py-2 rounded-lg text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors">+ 设备</button>
             <button onClick={() => setShowPortConfig(true)} className="px-4 py-2 rounded-lg text-sm border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">⚙ 端口</button>
+            <button onClick={() => setSortMode(v => !v)}
+              className={`px-4 py-2 rounded-lg text-sm border transition-colors ${sortMode ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400" : "border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"}`}>
+              {sortMode ? "✓ 排序中" : "⇅ 排序"}
+            </button>
             <button onClick={handleRefreshAll} disabled={refreshing}
               className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50">
               <span className={refreshing ? "animate-spin inline-block" : ""}>↻</span>全部刷新
@@ -500,16 +500,18 @@ export function ServicesPanel() {
           </div>
         )}
 
-        {orderedGroups.map(groupName => (
+        {orderedGroups.map((groupName, idx) => (
           <DeviceGroup
             key={groupName}
             groupName={groupName}
             devices={groups[groupName]}
             collapsed={!!collapsed[groupName]}
             onToggle={() => setCollapsed(c => ({ ...c, [groupName]: !c[groupName] }))}
-            onDragStart={() => handleDragStart(groupName)}
-            onDragOver={handleDragOver}
-            onDrop={() => handleDrop(groupName)}
+            sortMode={sortMode}
+            onMoveUp={() => moveGroup(groupName, -1)}
+            onMoveDown={() => moveGroup(groupName, 1)}
+            isFirst={idx === 0}
+            isLast={idx === orderedGroups.length - 1}
             cardProps={cardProps}
           />
         ))}

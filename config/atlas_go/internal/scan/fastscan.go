@@ -160,11 +160,31 @@ func updateSQLiteDB(hosts map[string]string, gatewayIP string, interfaceName str
 	}
 	defer dbConn.Close()
 
-	_, _ = dbConn.Exec("UPDATE hosts SET online_status = 'offline' WHERE interface_name = ?", interfaceName)
-	_, _ = dbConn.Exec("UPDATE devices SET online_status = 'offline' WHERE interface_name = ?", interfaceName)
+	// Collect discovered IPs first
+	discoveredIPs := make(map[string]bool)
+	for ip := range hosts {
+		discoveredIPs[ip] = true
+	}
+
+	// Mark only hosts NOT in this scan as offline (don't touch others)
+	rows, _ := dbConn.Query("SELECT current_ip FROM devices WHERE interface_name = ?", interfaceName)
+	var existingIPs []string
+	if rows != nil {
+		for rows.Next() {
+			var ip string
+			rows.Scan(&ip)
+			existingIPs = append(existingIPs, ip)
+		}
+		rows.Close()
+	}
+	for _, ip := range existingIPs {
+		if !discoveredIPs[ip] {
+			dbConn.Exec("UPDATE devices SET online_status='offline' WHERE current_ip=? AND interface_name=?", ip, interfaceName)
+			dbConn.Exec("UPDATE hosts SET online_status='offline' WHERE ip=? AND interface_name=?", ip, interfaceName)
+		}
+	}
 
 	for ip, name := range hosts {
-		// Use IP as fallback name; tag as "其他" for unnamed hosts
 		tag := ""
 		if name == "" || name == "NoName" {
 			name = ip
