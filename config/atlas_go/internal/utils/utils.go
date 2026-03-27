@@ -67,8 +67,14 @@ func GetAllInterfaces() ([]InterfaceInfo, error) {
 					// Convert IP to subnet base (e.g., 192.168.1.5/24 -> 192.168.1.0/24)
 					ipParts := strings.Split(ip, ".")
 					if len(ipParts) == 4 {
-						maskBits := strings.Split(fullSubnet, "/")[1]
-						subnetBase := fmt.Sprintf("%s.%s.%s.0/%s", ipParts[0], ipParts[1], ipParts[2], maskBits)
+						maskStr := strings.Split(fullSubnet, "/")[1]
+						maskBits := 24
+						fmt.Sscanf(maskStr, "%d", &maskBits)
+						// /32 means no subnet info — fall back to /24
+						if maskBits >= 32 {
+							maskBits = 24
+						}
+						subnetBase := fmt.Sprintf("%s.%s.%s.0/%d", ipParts[0], ipParts[1], ipParts[2], maskBits)
 						interfaces = append(interfaces, InterfaceInfo{
 							Name:   ifName,
 							Subnet: subnetBase,
@@ -102,12 +108,11 @@ func GetAllInterfaces() ([]InterfaceInfo, error) {
 					if ip4 == nil || ip4.IsLoopback() {
 						continue
 					}
-					// Compute network base; if mask unknown, assume /24
 					ones, _ := ipNet.Mask.Size()
-					maskBits := 24
-					if ones > 0 {
-						maskBits = ones
-					}
+				maskBits := 24
+				if ones > 0 && ones < 32 {
+					maskBits = ones
+				}
 					ipParts := strings.Split(ip4.String(), ".")
 					if len(ipParts) != 4 {
 						continue

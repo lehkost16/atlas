@@ -3,113 +3,67 @@ set -euo pipefail
 
 echo "🔧 Atlas CI/CD Deployment Script"
 
-### Sync docker group membership for current session (avoid infinite recursion)
-# Resolve absolute path to this script for re-exec
-SCRIPT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "$0")"
-if [[ -z "${ATLAS_IN_SG:-}" ]]; then
-  if command -v id >/dev/null 2>&1 && id -nG 2>/dev/null | grep -qw docker; then
-    echo "✅ Docker group already present; continuing..."
-  elif command -v sg >/dev/null 2>&1; then
-    echo "🔄 Syncing docker group membership..."
-    # Reconstruct quoted args safely
-    QUOTED_ARGS=()
-    for arg in "$@"; do
-      QUOTED_ARGS+=("$(printf '%q' "$arg")")
-    done
-    CMD="ATLAS_IN_SG=1 \"$SCRIPT_PATH\" ${QUOTED_ARGS[*]}"
-    exec sg docker -c "$CMD"
-  else
-    echo "⚠️ 'sg' command not available; proceeding without group switch"
-  fi
-else
-  echo "✅ Running under docker group context"
-fi
-
-# Resolve repo root from this script's location
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-UI_DIR="${REPO_ROOT}/data/react-ui"
-HTML_DIR="${REPO_ROOT}/data/html"
-IMAGE="keinstien/atlas"
-CONTAINER_NAME="atlas-dev"
-CURRENT_VERSION=$(awk -F'"' '{print $4}' $HTML_DIR/build-info.json)
-
-echo "📁 Repo root: $REPO_ROOT"
-echo "🧩 UI dir:    $UI_DIR"
-echo "🗂️  HTML dir:   $HTML_DIR"
-
-# Prompt for version (allow env override)
-if [[ -z "${VERSION:-}" ]]; then
-  read -p "👉 Enter the version tag (current version: $CURRENT_VERSION): " VERSION
-fi
-if [[ -z "${VERSION:-}" ]]; then
-  echo "❌ Version tag is required. Exiting..."
+# Check docker access
+if ! docker info >/dev/null 2>&1; then
+  echo "❌ Cannot connect to Docker. Run: sudo usermod -aG docker \$USER && newgrp docker"
   exit 1
 fi
+echo "✅ Docker access confirmed"
 
-# Ask whether to also tag this version as 'latest' (allow env override)
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+UI_DIR="${REPO_ROOT}/data/react-ui"
+IMAGE="keinstien/atlas"
+CONTAINER_NAME="atlas-dev"
+
+echo "📁 Repo root: $REPO_ROOT"
+
+# Version
+if [[ -z "${VERSION:-}" ]]; then
+  read -p "👉 Version tag (e.g. v4.0): " VERSION
+fi
+[[ -z "${VERSION:-}" ]] && { echo "❌ Version required."; exit 1; }
+
+# Tag as latest?
 if [[ -z "${TAG_LATEST:-}" ]]; then
-  read -p "👉 Tag this version as 'latest' as well? (y/N): " TAG_LATEST
+  read -p "👉 Also tag as 'latest'? (y/N): " TAG_LATEST
 fi
-if [[ "${TAG_LATEST:-}" =~ ^([yY][eE][sS]|[yY])$ ]]; then
-  DO_LATEST=true
-else
-  DO_LATEST=false
+[[ "${TAG_LATEST:-}" =~ ^[yY] ]] && DO_LATEST=true || DO_LATEST=false
+
+# Push to Docker Hub?
+if [[ -z "${DO_PUSH:-}" ]]; then
+  read -p "👉 Push to Docker Hub? (y/N): " DO_PUSH
 fi
+[[ "${DO_PUSH:-}" =~ ^[yY] ]] && PUSH=true || PUSH=false
 
-# Ask whether to push this version to Docker Hub (allow env override via PUSH_D or DO_PUSH)
-if [[ -z "${PUSH_D:-}" && -z "${DO_PUSH:-}" ]]; then
-  read -p "👉 Push this version to Docker Hub? (y/N): " PUSH_D
-fi
-if [[ "${PUSH_D:-}" =~ ^([yY][eE][sS]|[yY])$ || "${DO_PUSH:-}" =~ ^([tT][rR][uU][eE]|[yY][eE][sS]|[yY])$ ]]; then
-  DO_PUSH=true
-else
-  DO_PUSH=false
-fi
+[[ -d "$UI_DIR" ]] || { echo "❌ UI dir not found: $UI_DIR"; exit 1; }
 
-# Sanity checks
-command -v docker >/dev/null 2>&1 || { echo "❌ docker is not installed or not in PATH"; exit 1; }
-[[ -d "$UI_DIR" ]] || { echo "❌ React UI directory not found at: $UI_DIR"; exit 1; }
-
-echo "📦 Starting deployment for version: $VERSION"
-
-# Step 1: Write build-info.json (baked into the image via Dockerfile ui-builder stage)
-echo "📝 Writing build-info.json..."
+# Write build-info.json into React public/ (picked up by ui-builder stage)
 COMMIT_SHA="$(git -C "$REPO_ROOT" rev-parse --short HEAD 2>/dev/null || echo 'dirty')"
 BUILD_TIME="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
 mkdir -p "$UI_DIR/public"
-cat > "${UI_DIR}/public/build-info.json" <<EOF
+cat > "$UI_DIR/public/build-info.json" <<EOF
 { "version": "${VERSION}", "commit": "${COMMIT_SHA}", "builtAt": "${BUILD_TIME}" }
 EOF
+echo "� build-info.json written (version: $VERSION, commit: $COMMIT_SHA)"
 
-# Step 2: Stop and remove existing container if present
-echo "🧹 Removing existing '$CONTAINER_NAME' container if running..."
+# Stop existing container
 docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
 
-# Step 3: Build Docker image (React + Go built inside Docker)
-echo "🐳 Building Docker image: $IMAGE:$VERSION"
-DOCKER_BUILDKIT=1 docker build -t "$IMAGE:$VERSION" "$REPO_ROOT"
+# Build image (React + Go compiled inside Docker)
+echo "🐳 Building $IMAGE:$VERSION ..."
+docker build -t "$IMAGE:$VERSION" "$REPO_ROOT"
 
-# Step 4: Optionally tag as latest
-if $DO_LATEST; then
-  echo "🔄 Tagging Docker image as latest"
-  docker tag "$IMAGE:$VERSION" "$IMAGE:latest"
-else
-  echo "⏭️ Skipping 'latest' tag per selection"
-fi
+$DO_LATEST && docker tag "$IMAGE:$VERSION" "$IMAGE:latest" && echo "� Tagged as latest"
 
-# Step 5: Push image(s) to Docker Hub
-if ! $DO_PUSH; then
-  echo "⏭️ Skipping Docker push as requested"
-else
-  echo "📤 Pushing Docker image(s) to Docker Hub..."
+# Push
+if $PUSH; then
   docker push "$IMAGE:$VERSION"
-  if $DO_LATEST; then
-    docker push "$IMAGE:latest"
-  fi
+  $DO_LATEST && docker push "$IMAGE:latest"
+  echo "📤 Pushed to Docker Hub"
 fi
 
-# Step 6: Run new container
-echo "🚀 Deploying container..."
+# Run
+echo "� Starting container $CONTAINER_NAME ..."
 docker run -d \
   --name "$CONTAINER_NAME" \
   --network=host \
@@ -118,11 +72,10 @@ docker run -d \
   -e ATLAS_UI_PORT=8884 \
   -e ATLAS_API_PORT=8885 \
   -e ATLAS_ADMIN_PASSWORD='change-me' \
+  -e SCAN_SUBNETS='192.168.10.0/24,192.168.11.0/24' \
   -v /var/run/docker.sock:/var/run/docker.sock \
   "$IMAGE:$VERSION"
 
-if $DO_LATEST; then
-  echo "✅ Deployment complete for version: $VERSION (also tagged as latest)"
-else
-  echo "✅ Deployment complete for version: $VERSION"
-fi
+echo "✅ Done — version: $VERSION"
+echo "   UI:  http://localhost:8884"
+echo "   API: http://localhost:8885/api/docs"

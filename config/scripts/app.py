@@ -460,6 +460,7 @@ def stream_log(filename: str, user: str = Depends(require_auth)):
 def get_db():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
+    conn.text_factory = lambda b: b.decode("utf-8", errors="replace")
     return conn
 
 
@@ -487,8 +488,8 @@ def list_devices(show_ignored: bool = False, user: str = Depends(require_auth)):
     conn = get_db()
     try:
         cur = conn.cursor()
-        base_filter = "d.ignored = 0 AND d.hostname IS NOT NULL AND d.hostname != '' AND d.hostname != 'NoName'"
-        where = f"WHERE {base_filter}" if not show_ignored else "WHERE d.hostname IS NOT NULL AND d.hostname != '' AND d.hostname != 'NoName'"
+        base_filter = "d.ignored = 0 AND d.hostname IS NOT NULL AND d.hostname != ''"
+        where = f"WHERE {base_filter}" if not show_ignored else "WHERE d.hostname IS NOT NULL AND d.hostname != ''"
         cur.execute(f"""
             SELECT d.mac, d.hostname, d.alias, d.current_ip, d.tags, d.os_details,
                    d.interface_name, d.next_hop, d.network_name, d.last_seen,

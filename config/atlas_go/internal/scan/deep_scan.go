@@ -109,20 +109,37 @@ func bestHostName(ip string, nmapName string) string {
 }
 
 func discoverLiveHosts(subnet string) ([]HostInfo, error) {
-	out, err := exec.Command("nmap", "-sn", subnet).Output()
-	if err != nil {
-		return nil, err
-	}
-	var hosts []HostInfo
-	for _, line := range strings.Split(string(out), "\n") {
-		if strings.HasPrefix(line, "Nmap scan report for") {
-			fields := strings.Fields(line)
-			if len(fields) == 6 && strings.HasPrefix(fields[5], "(") {
-				hosts = append(hosts, HostInfo{IP: strings.Trim(fields[5], "()"), Name: fields[4]})
-			} else if len(fields) == 5 {
-				hosts = append(hosts, HostInfo{IP: fields[4], Name: "NoName"})
+	seen := make(map[string]string) // ip -> name
+
+	for _, args := range [][]string{
+		{"-sn", "-T4", "--min-parallelism", "100", subnet},
+		{"-sn", "-PR", "-T4", "--min-parallelism", "100", subnet},
+	} {
+		out, err := exec.Command("nmap", args...).Output()
+		if err != nil {
+			continue
+		}
+		for _, line := range strings.Split(string(out), "\n") {
+			if strings.HasPrefix(line, "Nmap scan report for") {
+				fields := strings.Fields(line)
+				if len(fields) == 6 && strings.HasPrefix(fields[5], "(") {
+					ip := strings.Trim(fields[5], "()")
+					if _, exists := seen[ip]; !exists {
+						seen[ip] = fields[4]
+					}
+				} else if len(fields) == 5 {
+					ip := fields[4]
+					if _, exists := seen[ip]; !exists {
+						seen[ip] = "NoName"
+					}
+				}
 			}
 		}
+	}
+
+	var hosts []HostInfo
+	for ip, name := range seen {
+		hosts = append(hosts, HostInfo{IP: ip, Name: name})
 	}
 	return hosts, nil
 }
@@ -151,8 +168,15 @@ func parseNmapPorts(s string) string {
 }
 
 func scanAllTcp(ip string, logProgress *os.File) (string, string) {
+	scanPorts := getServicePorts()
+	portList := make([]string, len(scanPorts))
+	for i, p := range scanPorts {
+		portList[i] = fmt.Sprintf("%d", p)
+	}
+	portArg := strings.Join(portList, ",")
+
 	logFile := fmt.Sprintf("%s/nmap_tcp_%s.log", db.LogsDir(), strings.ReplaceAll(ip, ".", "_"))
-	cmd := exec.Command("nmap", "-O", "-p-", ip, "-oG", logFile)
+	cmd := exec.Command("nmap", "-O", "-p", portArg, "-T4", ip, "-oG", logFile)
 	start := time.Now()
 	cmd.Run()
 	fmt.Fprintf(logProgress, "TCP scan for %s finished in %s\n", ip, time.Since(start))
@@ -163,7 +187,7 @@ func scanAllTcp(ip string, logProgress *os.File) (string, string) {
 	}
 	defer file.Close()
 
-	var ports, osInfo string
+	var openPorts, osInfo string
 	rePorts := regexp.MustCompile(`Ports: ([^\n]*?)Ignored State:`)
 	reOS := regexp.MustCompile(`OS: (.*)`)
 
@@ -171,7 +195,7 @@ func scanAllTcp(ip string, logProgress *os.File) (string, string) {
 	for scanner.Scan() {
 		line := scanner.Text()
 		if m := rePorts.FindStringSubmatch(line); m != nil {
-			ports = parseNmapPorts(m[1])
+			openPorts = parseNmapPorts(m[1])
 		}
 		if m := reOS.FindStringSubmatch(line); m != nil {
 			rawOs := m[1]
@@ -182,10 +206,10 @@ func scanAllTcp(ip string, logProgress *os.File) (string, string) {
 			osInfo = strings.TrimSpace(osInfo)
 		}
 	}
-	if ports == "" {
-		ports = "Unknown"
+	if openPorts == "" {
+		openPorts = "Unknown"
 	}
-	return ports, osInfo
+	return openPorts, osInfo
 }
 
 // fetchHTTPTitle fetches the <title> of an HTTP service
@@ -339,10 +363,19 @@ func upsertServices(db *sql.DB, mac string, services []ServiceInfo) {
 }
 
 func DeepScan() error {
-	interfaces, err := utils.GetAllInterfaces()
+	// Use SCAN_SUBNETS env var if set, otherwise auto-detect
+	subnets, err := utils.GetSubnetsToScan()
 	if err != nil {
-		fmt.Printf("⚠️ Could not auto-detect interfaces: %v, using fallback\n", err)
-		interfaces = []utils.InterfaceInfo{{Name: "unknown", Subnet: "192.168.2.0/24", IP: ""}}
+		fmt.Printf("⚠️ Could not detect subnets: %v, using fallback\n", err)
+		subnets = []string{"192.168.2.0/24"}
+	}
+
+	// Build interface map
+	ifaceMap := map[string]string{}
+	if ifaces, e := utils.GetAllInterfaces(); e == nil {
+		for _, iface := range ifaces {
+			ifaceMap[iface.Subnet] = iface.Name
+		}
 	}
 
 	startTime := time.Now()
@@ -352,16 +385,20 @@ func DeepScan() error {
 	defer lf.Close()
 
 	var hostInfos []HostInfo
-	for _, iface := range interfaces {
-		fmt.Fprintf(lf, "Discovering live hosts on %s (interface: %s)...\n", iface.Subnet, iface.Name)
-		hosts, err := discoverLiveHosts(iface.Subnet)
+	for _, subnet := range subnets {
+		ifaceName := ifaceMap[subnet]
+		if ifaceName == "" {
+			ifaceName = "unknown"
+		}
+		fmt.Fprintf(lf, "Discovering live hosts on %s (interface: %s)...\n", subnet, ifaceName)
+		hosts, err := discoverLiveHosts(subnet)
 		if err != nil {
-			fmt.Fprintf(lf, "Failed to discover hosts on %s: %v\n", iface.Subnet, err)
+			fmt.Fprintf(lf, "Failed to discover hosts on %s: %v\n", subnet, err)
 			continue
 		}
-		fmt.Fprintf(lf, "Discovered %d hosts on %s\n", len(hosts), iface.Subnet)
+		fmt.Fprintf(lf, "Discovered %d hosts on %s\n", len(hosts), subnet)
 		for _, host := range hosts {
-			host.InterfaceName = iface.Name
+			host.InterfaceName = ifaceName
 			hostInfos = append(hostInfos, host)
 		}
 	}
@@ -384,12 +421,13 @@ func DeepScan() error {
 		go func(idx int, host HostInfo) {
 			defer wg.Done()
 			ip := host.IP
-			name := bestHostName(ip, host.Name)
+			name := sanitizeName(bestHostName(ip, host.Name))
 
-			// Skip hosts with no resolvable name
+			// Use IP as fallback name; tag as "其他" for unnamed hosts
+			tag := ""
 			if name == "" || name == "NoName" {
-				fmt.Fprintf(lf, "Skipping unnamed host %s\n", ip)
-				return
+				name = ip
+				tag = "其他"
 			}
 			fmt.Fprintf(lf, "Scanning host %d/%d: %s\n", idx+1, total, ip)
 
@@ -418,16 +456,17 @@ func DeepScan() error {
 
 			if mac != "" && mac != "Unknown" {
 				_, _ = dbConn.Exec(`
-					INSERT INTO devices (mac, hostname, current_ip, os_details, interface_name, network_name, last_seen, online_status)
-					VALUES (?, ?, ?, ?, ?, 'LAN', ?, ?)
+					INSERT INTO devices (mac, hostname, current_ip, tags, os_details, interface_name, network_name, last_seen, online_status)
+					VALUES (?, ?, ?, ?, ?, ?, 'LAN', ?, ?)
 					ON CONFLICT(mac) DO UPDATE SET
 						hostname=excluded.hostname,
 						current_ip=excluded.current_ip,
 						os_details=excluded.os_details,
 						interface_name=excluded.interface_name,
 						last_seen=excluded.last_seen,
-						online_status=excluded.online_status
-				`, mac, name, ip, osInfo, host.InterfaceName, now, status)
+						online_status=excluded.online_status,
+						tags=CASE WHEN tags='' OR tags IS NULL THEN excluded.tags ELSE tags END
+				`, mac, name, ip, tag, osInfo, host.InterfaceName, now, status)
 
 				fmt.Fprintf(lf, "Probing services on %s (%s)...\n", ip, mac)
 				services := discoverServices(ip)

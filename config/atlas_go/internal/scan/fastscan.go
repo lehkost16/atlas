@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	_ "github.com/mattn/go-sqlite3"
 	"atlas/internal/db"
@@ -18,6 +19,25 @@ type HostInfo struct {
 	IP            string
 	Name          string
 	InterfaceName string
+}
+
+// sanitizeName removes non-UTF-8 bytes and control characters from hostnames
+func sanitizeName(s string) string {
+	if utf8.ValidString(s) {
+		return s
+	}
+	// Replace invalid bytes
+	var b strings.Builder
+	for i := 0; i < len(s); {
+		r, size := utf8.DecodeRuneInString(s[i:])
+		if r == utf8.RuneError && size == 1 {
+			b.WriteRune('?')
+		} else {
+			b.WriteRune(r)
+		}
+		i += size
+	}
+	return b.String()
 }
 
 func getDefaultGateway() (string, error) {
@@ -39,26 +59,36 @@ func getDefaultGateway() (string, error) {
 }
 
 func runNmap(subnet string) (map[string]string, error) {
-	out, err := exec.Command("nmap", "-sn", subnet).Output()
-	if err != nil {
-		return nil, err
-	}
+	// Run both ICMP and ARP scans, merge results for maximum coverage
+	results := make(map[string]string)
 
-	hosts := make(map[string]string)
-	for _, line := range strings.Split(string(out), "\n") {
-		if strings.HasPrefix(line, "Nmap scan report for") {
-			fields := strings.Fields(line)
-			if len(fields) == 6 && strings.HasPrefix(fields[5], "(") {
-				name := fields[4]
-				ip := strings.Trim(fields[5], "()")
-				hosts[ip] = name
-			} else if len(fields) == 5 {
-				ip := fields[4]
-				hosts[ip] = "NoName"
+	for _, args := range [][]string{
+		{"-sn", "-T4", "--min-parallelism", "100", subnet},
+		{"-sn", "-PR", "-T4", "--min-parallelism", "100", subnet},
+	} {
+		out, err := exec.Command("nmap", args...).Output()
+		if err != nil {
+			continue
+		}
+		for _, line := range strings.Split(string(out), "\n") {
+			if strings.HasPrefix(line, "Nmap scan report for") {
+				fields := strings.Fields(line)
+				if len(fields) == 6 && strings.HasPrefix(fields[5], "(") {
+					name := fields[4]
+					ip := strings.Trim(fields[5], "()")
+					if _, exists := results[ip]; !exists {
+						results[ip] = name
+					}
+				} else if len(fields) == 5 {
+					ip := fields[4]
+					if _, exists := results[ip]; !exists {
+						results[ip] = "NoName"
+					}
+				}
 			}
 		}
 	}
-	return hosts, nil
+	return results, nil
 }
 
 // getMacFromArp reads MAC address from /proc/net/arp for a given IP
@@ -83,29 +113,28 @@ func getMacFromArp(ip string) string {
 	return ""
 }
 
-// upsertDevice writes a discovered host into the devices table using MAC as primary key.
-// Falls back to writing into legacy hosts table if MAC is unavailable.
-func upsertDevice(db *sql.DB, ip, name, mac, gatewayIP, interfaceName string) error {
+// upsertDeviceWithTag writes a device; only sets tag if device has no existing tag
+func upsertDeviceWithTag(db *sql.DB, ip, name, mac, gatewayIP, interfaceName, defaultTag string) error {
 	now := time.Now().Format("2006-01-02 15:04:05")
 
 	if mac != "" && mac != "Unknown" {
 		_, err := db.Exec(`
-			INSERT INTO devices (mac, hostname, current_ip, interface_name, next_hop, network_name, last_seen, online_status)
-			VALUES (?, ?, ?, ?, ?, 'LAN', ?, 'online')
+			INSERT INTO devices (mac, hostname, current_ip, tags, interface_name, next_hop, network_name, last_seen, online_status)
+			VALUES (?, ?, ?, ?, ?, ?, 'LAN', ?, 'online')
 			ON CONFLICT(mac) DO UPDATE SET
 				hostname=excluded.hostname,
 				current_ip=excluded.current_ip,
 				interface_name=excluded.interface_name,
 				next_hop=excluded.next_hop,
 				last_seen=excluded.last_seen,
-				online_status='online'
-		`, mac, name, ip, interfaceName, gatewayIP, now)
+				online_status='online',
+				tags=CASE WHEN tags='' OR tags IS NULL THEN excluded.tags ELSE tags END
+		`, mac, name, ip, defaultTag, interfaceName, gatewayIP, now)
 		if err != nil {
 			return fmt.Errorf("upsert device %s: %v", mac, err)
 		}
 	}
 
-	// Also keep legacy hosts table in sync
 	_, err := db.Exec(`
 		INSERT INTO hosts (ip, name, os_details, mac_address, open_ports, next_hop, network_name, interface_name, last_seen, online_status)
 		VALUES (?, ?, 'Unknown', ?, 'Unknown', ?, 'LAN', ?, ?, 'online')
@@ -119,6 +148,11 @@ func upsertDevice(db *sql.DB, ip, name, mac, gatewayIP, interfaceName string) er
 	return err
 }
 
+// upsertDevice is kept for backward compat
+func upsertDevice(db *sql.DB, ip, name, mac, gatewayIP, interfaceName string) error {
+	return upsertDeviceWithTag(db, ip, name, mac, gatewayIP, interfaceName, "")
+}
+
 func updateSQLiteDB(hosts map[string]string, gatewayIP string, interfaceName string) error {
 	dbConn, err := sql.Open("sqlite3", db.DBPath())
 	if err != nil {
@@ -130,12 +164,14 @@ func updateSQLiteDB(hosts map[string]string, gatewayIP string, interfaceName str
 	_, _ = dbConn.Exec("UPDATE devices SET online_status = 'offline' WHERE interface_name = ?", interfaceName)
 
 	for ip, name := range hosts {
-		// Skip hosts with no resolvable name (likely personal/unknown devices)
+		// Use IP as fallback name; tag as "其他" for unnamed hosts
+		tag := ""
 		if name == "" || name == "NoName" {
-			continue
+			name = ip
+			tag = "其他"
 		}
 		mac := getMacFromArp(ip)
-		if err := upsertDevice(dbConn, ip, name, mac, gatewayIP, interfaceName); err != nil {
+		if err := upsertDeviceWithTag(dbConn, ip, sanitizeName(name), mac, gatewayIP, interfaceName, tag); err != nil {
 			fmt.Printf("Insert/update failed for %s: %v\n", ip, err)
 		}
 	}
@@ -201,9 +237,18 @@ func fastScanCore(lf *os.File) error {
 		}
 	}
 
-	interfaces, err := utils.GetAllInterfaces()
+	// Use SCAN_SUBNETS env var if set, otherwise auto-detect interfaces
+	subnets, err := utils.GetSubnetsToScan()
 	if err != nil {
-		return fmt.Errorf("failed to detect network interfaces: %v", err)
+		return fmt.Errorf("failed to detect subnets: %v", err)
+	}
+
+	// Build interface map for subnet → interface name
+	ifaceMap := map[string]string{}
+	if ifaces, e := utils.GetAllInterfaces(); e == nil {
+		for _, iface := range ifaces {
+			ifaceMap[iface.Subnet] = iface.Name
+		}
 	}
 
 	gatewayIP, err := getDefaultGateway()
@@ -213,18 +258,22 @@ func fastScanCore(lf *os.File) error {
 	}
 
 	totalHosts := 0
-	for _, iface := range interfaces {
-		logf("Discovering live hosts on %s (interface: %s)...", iface.Subnet, iface.Name)
-		hosts, err := runNmap(iface.Subnet)
+	for _, subnet := range subnets {
+		ifaceName := ifaceMap[subnet]
+		if ifaceName == "" {
+			ifaceName = "unknown"
+		}
+		logf("Discovering live hosts on %s (interface: %s)...", subnet, ifaceName)
+		hosts, err := runNmap(subnet)
 		if err != nil {
-			logf("⚠️ Failed to scan subnet %s on interface %s: %v", iface.Subnet, iface.Name, err)
+			logf("⚠️ Failed to scan subnet %s: %v", subnet, err)
 			continue
 		}
-		logf("Discovered %d hosts on %s", len(hosts), iface.Subnet)
+		logf("Discovered %d hosts on %s", len(hosts), subnet)
 		totalHosts += len(hosts)
 
-		if err := updateSQLiteDB(hosts, gatewayIP, iface.Name); err != nil {
-			logf("⚠️ Failed to update database for interface %s: %v", iface.Name, err)
+		if err := updateSQLiteDB(hosts, gatewayIP, ifaceName); err != nil {
+			logf("⚠️ Failed to update database for subnet %s: %v", subnet, err)
 			continue
 		}
 	}

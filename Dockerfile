@@ -2,7 +2,13 @@
 FROM golang:1.22 AS go-builder
 WORKDIR /app
 COPY config/atlas_go /app
-RUN go build -o atlas .
+# Build with vendor if present, otherwise download with proxy fallback
+ENV GOPROXY=https://goproxy.cn,https://goproxy.io,direct
+RUN if [ -d vendor ]; then \
+      go build -mod=vendor -o atlas .; \
+    else \
+      go mod download && go build -o atlas .; \
+    fi
 
 # Stage 2: Build React UI
 FROM node:20-alpine AS ui-builder
